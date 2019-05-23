@@ -1,0 +1,46 @@
+sudo: required
+
+services:
+  - docker
+
+before_install:
+  - docker build -t holhas/multi-docker-test -f ./client/Dockerfile.dev ./client
+
+# primary test running section:
+# all scripts have to exit with 0 
+# otherwise build will be considered failed by travis
+script:
+  # npm enters "watch" mode by default (never exits)
+  # => add -- --coverage
+  - docker run -e CI=true holhas/multi-docker-test npm run test -- --coverage --watchAll=false
+  # we could add tests for server and worker here with 
+  # adding the build commands for these modules above
+
+after_success:
+  - docker build -t holhas/multi-client ./client
+  - docker build -t holhas/multi-nginx ./nginx
+  - docker build -t holhas/multi-server ./server
+  - docker build -t holhas/multi-worker ./worker
+  # log in to docker CLI
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
+  # take those images and push them to docker hub
+  - docker push holhas/multi-client
+  - docker push holhas/multi-nginx
+  - docker push holhas/multi-server
+  - docker push holhas/multi-worker
+
+
+
+
+# deploy:
+#   provider: elasticbeanstalk
+#   region: "us-east-2"
+#   app: "docker-react"
+#   env: "DockerReact-env"
+#   bucket_name: "elasticbeanstalk-us-east-2-473449314582"
+#   bucket_path: "docker-react"
+#   on:
+#     branch: master
+#   access_key_id: $AWS_ACCESS_KEY
+#   secret_access_key:
+#     secure: "$AWS_SECRET_KEY"
